@@ -1,2 +1,4 @@
 ﻿  main.cpp
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cpp(115,21): warning C4018: '<': signed/unsigned mismatch
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cpp(121,27): warning C4018: '<': signed/unsigned mismatch
   state machine lib.vcxproj -> C:\Users\james.marshall\source\repos\state machine lib\Debug\state machine lib.exe

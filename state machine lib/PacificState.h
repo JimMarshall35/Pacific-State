@@ -156,6 +156,8 @@ namespace PS {
         void TryFire(TTrigger trigger); 
         void FireAsync(TTrigger trigger);
         void HandleEventQueue();
+        std::vector<TTrigger> GetCurrentAllowedTransitions();
+        inline bool GetIsFiringEvents() { return m_isFiringEvents; }
     private:
         void FireInternalImmediate(TTrigger trigger);
         void FireInternalQueued(TTrigger trigger);
@@ -163,6 +165,7 @@ namespace PS {
     private:
         int m_numStates = 0;
         int m_numTriggers = 0;
+        std::atomic_bool m_isFiringEvents = false;
         TState m_currentState;
         std::vector<StateRepresentation> m_states;
         std::queue<TTrigger> m_eventQueue;
@@ -171,6 +174,7 @@ namespace PS {
         std::mutex m_firingMutex;
         std::atomic_bool m_asyncMode = false;
         std::unique_ptr<std::thread> m_asyncThread;
+        
     };
 
 #pragma region StateRepresentation
@@ -422,7 +426,11 @@ namespace PS {
     template<typename TState, typename TTrigger>
     inline void StateMachine<TState, TTrigger>::HandleEventQueue()
     {
+        if (!m_eventQueue.empty()) 
+            m_isFiringEvents = true;
+        
         while (!m_eventQueue.empty()) {
+            
             TTrigger trigger = m_eventQueue.front();
             m_eventQueue.pop();
             try {
@@ -432,6 +440,7 @@ namespace PS {
                 std::cout << e.what() << std::endl;
             }
         }
+        m_isFiringEvents = false;
     }
 
     template<typename TState, typename TTrigger>
@@ -441,6 +450,19 @@ namespace PS {
             m_asyncMode = false;
             m_asyncThread->join();
         }
+    }
+
+    template<typename TState, typename TTrigger>
+    inline std::vector<TTrigger> PS::StateMachine<TState, TTrigger>::GetCurrentAllowedTransitions()
+    {
+        std::vector<TTrigger> returnvec;
+        auto& allowedTransitions = m_states[(int)m_currentState].AllowedTransitions;
+        for (int i = 0; i < m_numTriggers; i++) {
+            if ((int)allowedTransitions[i] != 0) {
+                returnvec.push_back((TTrigger)i);
+            }
+        }
+        return returnvec;
     }
 
 #pragma endregion
