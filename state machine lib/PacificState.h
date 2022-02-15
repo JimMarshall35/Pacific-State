@@ -24,6 +24,7 @@ namespace PS {
     template <typename TState, typename TTrigger>
     class StateMachine<TState, TTrigger>
     {
+        // assert both template params are enums based on unsigned ints
         static_assert(std::is_enum<TState>::value == true, "state machine state type must be an enum");
         static_assert(std::is_enum<TTrigger>::value == true, "state machine trigger type must be an enum");
         static_assert(std::is_same_v<std::underlying_type<TState>::type, unsigned int >, "state machine state type must be based on unsigned int");
@@ -420,17 +421,15 @@ namespace PS {
         {
             std::lock_guard<std::mutex> lg(m_eventQueueMutex);
             m_eventQueue.push(trigger);
+            m_isFiringEvents = true;
         }
     }
 
     template<typename TState, typename TTrigger>
     inline void StateMachine<TState, TTrigger>::HandleEventQueue()
     {
-        if (!m_eventQueue.empty()) 
-            m_isFiringEvents = true;
         
         while (!m_eventQueue.empty()) {
-            
             TTrigger trigger = m_eventQueue.front();
             m_eventQueue.pop();
             try {
@@ -440,7 +439,8 @@ namespace PS {
                 std::cout << e.what() << std::endl;
             }
         }
-        m_isFiringEvents = false;
+        if(m_isFiringEvents)
+            m_isFiringEvents = false;
     }
 
     template<typename TState, typename TTrigger>
