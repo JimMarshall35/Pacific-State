@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 #include <vector>
 #include <queue>
 #include <functional>
@@ -14,7 +13,7 @@
 #include <type_traits>
 
 namespace PS {
-    
+
     enum class PSFiringMode {
         Immediate,
         Queued
@@ -24,13 +23,12 @@ namespace PS {
     template <typename TState, typename TTrigger>
     class StateMachine<TState, TTrigger>
     {
-        // assert both template params are enums based on unsigned ints
         static_assert(std::is_enum<TState>::value == true, "state machine state type must be an enum");
         static_assert(std::is_enum<TTrigger>::value == true, "state machine trigger type must be an enum");
         static_assert(std::is_same_v<std::underlying_type<TState>::type, unsigned int >, "state machine state type must be based on unsigned int");
         static_assert(std::is_same_v<std::underlying_type<TTrigger>::type, unsigned int >, "state machine trigger type must based mon unsigned int");
     public:
-        
+
 #pragma region  internal types
 
 #pragma region  TriggerNotFoundException
@@ -48,7 +46,7 @@ namespace PS {
         };
 
 #pragma endregion
-        
+
 #pragma region TransitionInfo
 
         struct TransitionInfo {
@@ -61,32 +59,51 @@ namespace PS {
 
 #pragma region StateRepresentation
 
-        class StateRepresentation{
+        class StateRepresentation {
         public:
-            friend class StateMachine;
-            std::vector<std::function<void(TransitionInfo)>> InternalTransitions;
-            std::vector<TState> AllowedTransitions;
             StateRepresentation(TState s, StateMachine* sm) :State(s), m_stateMachinePtr(sm) {}
             StateRepresentation() {}
-            TState State;
-            std::function<void(TransitionInfo)> OnEnter = nullptr;
-            std::function<void(TransitionInfo)> OnExit = nullptr;
-            void AddTransition(TTrigger trigger, TState state) { 
-                AllowedTransitions[(unsigned int)trigger] = state;
-            }
+            // setters
+            void AddTransition(TTrigger trigger, TState state);
+            void AddInternalTransition(TTrigger trigger, std::function<void(TransitionInfo)> action);
+            void AddSubState(StateRepresentation* subState) { m_subStates.push_back(subState); }
+            void SetSuperState(StateRepresentation* superState) { m_superState = superState; }
+            void SetOnEnter(std::function<void(TransitionInfo)> handler);
+            void SetOnExit(std::function<void(TransitionInfo)> handler);
+            void AddGuardClause(TTrigger trigger, std::function<bool()> guard);
+            
             bool FindTransition(TState& transitionOnOutput, TTrigger trigger);
             bool FindInternalTransition(std::function<void(TransitionInfo)>& transitionFunction, TTrigger trigger);
-#
-            StateRepresentation* SuperState = nullptr;
-
-            std::vector<StateRepresentation*> SubStates;
-            
             bool Includes(TState state); // is state this state or one of its sub states
             bool IsIncludedIn(TState state); // Checks if the state is in the set of this state or a super-state
             void Enter(TransitionInfo t);
             void Exit(TransitionInfo t);
+            bool HasEnterHandler() { return m_onEnter != nullptr; }
+            bool HasExitHandler() { return m_onExit != nullptr; }
+            void ResizeTransitions(size_t val) { m_allowedTransitions.resize(val); }
+            void ResizeInternalTransitions(size_t val) { m_internalTransitions.resize(val); }
+            void ResizeGuardClauses(size_t val) { m_guardClauses.resize(val); }
+            void SetStateMachinePtr(StateMachine* ptr) { m_stateMachinePtr = ptr; }
+            void GetAllowedTransitions(std::vector<TTrigger>& returnvec) const;
+            const std::vector<std::function<bool()>>& GetGuardClauses() { return m_guardClauses; }
+
+        public:
+            TState State;
+
         private:
+            std::vector<std::function<bool()>> m_guardClauses;
             StateMachine* m_stateMachinePtr = nullptr;
+            std::vector<TState> m_allowedTransitions;
+            std::vector<std::function<void(TransitionInfo)>> m_internalTransitions;
+            
+
+            std::function<void(TransitionInfo)> m_onEnter = nullptr;
+            std::function<void(TransitionInfo)> m_onExit = nullptr;
+            StateRepresentation* m_superState = nullptr;
+            std::vector<StateRepresentation*> m_subStates;
+
+            
+            
         };
 
 #pragma endregion
@@ -97,37 +114,61 @@ namespace PS {
         private:
             StateMachine* m_stateMachinePtr;
         public:
-            StateConfigObject(StateMachine* parent) : m_stateMachinePtr(parent){}
+            StateConfigObject(StateMachine* parent) : m_stateMachinePtr(parent) {}
             TState StateEnum;
             StateConfigObject Permit(TTrigger trigger, TState state) {
                 auto& staterep = m_stateMachinePtr->m_states[(int)StateEnum];
-                staterep.AddTransition(trigger,state);
+                staterep.AddTransition(trigger, state);
                 return *this;
             }
             StateConfigObject OnEntry(std::function<void(TransitionInfo)> func) {
                 auto& staterep = m_stateMachinePtr->m_states[(int)StateEnum];
-                staterep.OnEnter = func;
+                staterep.SetOnEnter(func);
                 return *this;
             }
             StateConfigObject OnExit(std::function<void(TransitionInfo)> func) {
                 auto& staterep = m_stateMachinePtr->m_states[(int)StateEnum];
-                staterep.OnExit = func;
+                staterep.SetOnExit(func);
                 return *this;
             }
             StateConfigObject SubStateOf(TState superstate) {
                 auto& staterep = m_stateMachinePtr->m_states[(int)StateEnum];
-                staterep.SuperState = &m_stateMachinePtr->m_states[(int)superstate];
+                staterep.SetSuperState(&m_stateMachinePtr->m_states[(int)superstate]);
                 auto& superstaterep = m_stateMachinePtr->m_states[(int)superstate];
-                superstaterep.SubStates.push_back(&staterep);
+                superstaterep.AddSubState(&staterep);
                 return *this;
             }
             StateConfigObject InternalTransition(TTrigger trigger, std::function<void(TransitionInfo)> action) {
                 auto& staterep = m_stateMachinePtr->m_states[(int)StateEnum];
-                staterep.InternalTransitions[trigger] = action;
+                staterep.AddInternalTransition(trigger, action);
+                return *this;
+            }
+            StateConfigObject PermitIf(TTrigger trigger, TState state, std::function<bool()> guard) {
+                auto& staterep = m_stateMachinePtr->m_states[(int)StateEnum];
+                staterep.AddTransition(trigger, state);
+                staterep.AddGuardClause(trigger, guard);
                 return *this;
             }
         };
 #pragma endregion
+
+#pragma region TriggerEventData
+
+        enum class TriggerEventDataTypes { Int, Bool, String, Float, Double, CharPtr };
+        struct TriggerEventData
+        {
+            TriggerEventDataTypes Tag;
+            union Value {
+                int i;
+                bool b;
+                std::string s;
+                float f;
+                double d;
+                char* cp;
+            }val;
+        };
+#pragma endregion
+
 
 #pragma endregion
 
@@ -138,31 +179,20 @@ namespace PS {
             m_states[(int)state].State = state;
             return config;
         }
-
-        StateMachine(int numstates, int numtriggers, TState initialState) 
-            : m_currentState(initialState), m_numStates(numstates), m_numTriggers(numtriggers){ 
-            m_states.resize(numstates); 
-            for (int i = 0; i < numstates; i++) {
-                auto& state = m_states[i];
-                state.AllowedTransitions.resize(numtriggers);
-                state.InternalTransitions.resize(numtriggers);
-                state.m_stateMachinePtr = this;
-                //memset(state.m_allowedTransitions.data(),)
-            }
-        }
-
+        StateMachine(int numstates, int numtriggers, TState initialState);
         ~StateMachine();
-        void RunAsync();
+        void RunActive();
         void Fire(TTrigger trigger);
-        void TryFire(TTrigger trigger); 
+        void TryFire(TTrigger trigger);
         void FireAsync(TTrigger trigger);
         void HandleEventQueue();
-        std::vector<TTrigger> GetCurrentAllowedTransitions();
-        inline bool GetIsFiringEvents() { return m_isFiringEvents; }
+        std::vector<TTrigger> GetCurrentAvailableTransitions() const;
+        inline bool GetIsFiringEvents() const { return m_isFiringEvents; }
+        bool EventQueueEmpty();
     private:
         void FireInternalImmediate(TTrigger trigger);
         void FireInternalQueued(TTrigger trigger);
-        
+
     private:
         int m_numStates = 0;
         int m_numTriggers = 0;
@@ -172,42 +202,72 @@ namespace PS {
         std::queue<TTrigger> m_eventQueue;
         PSFiringMode m_firingMode = PSFiringMode::Queued;
         std::mutex m_eventQueueMutex;
-        std::mutex m_firingMutex;
+
+
         std::atomic_bool m_asyncMode = false;
         std::unique_ptr<std::thread> m_asyncThread;
-        
     };
 
 #pragma region StateRepresentation
     template<typename TState, typename TTrigger>
     inline bool PS::StateMachine<TState, TTrigger>::StateRepresentation::FindInternalTransition(std::function<void(TransitionInfo)>& transitionFunction, TTrigger trigger)
     {
-        auto& currentState = m_stateMachinePtr->m_states[(unsigned int)State];
-        auto& v = currentState.InternalTransitions;
-
-        if (v[(int)trigger] != nullptr) {
-            transitionFunction = v[(int)trigger];
+        if (m_internalTransitions[(int)trigger] != nullptr) {
+            transitionFunction = m_internalTransitions[(int)trigger];
             return true;
         }
-        else if (SuperState) {
-            return SuperState->FindInternalTransition(transitionFunction, trigger);
+        else if (m_superState) {
+            return m_superState->FindInternalTransition(transitionFunction, trigger);
         }
         return false;
     }
 
 
     template<typename TState, typename TTrigger>
+    inline void StateMachine<TState, TTrigger>::StateRepresentation::AddTransition(TTrigger trigger, TState state)
+    {
+        m_allowedTransitions[(unsigned int)trigger] = state;
+
+    }
+
+    template<typename TState, typename TTrigger>
+    inline void StateMachine<TState, TTrigger>::StateRepresentation::AddInternalTransition(TTrigger trigger, std::function<void(TransitionInfo)> action)
+    {
+        m_internalTransitions[(unsigned int)trigger] = action;
+    }
+
+
+
+
+
+    template<typename TState, typename TTrigger>
+    inline void StateMachine<TState, TTrigger>::StateRepresentation::SetOnEnter(std::function<void(TransitionInfo)> handler)
+    {
+        m_onEnter = handler;
+    }
+
+    template<typename TState, typename TTrigger>
+    inline void StateMachine<TState, TTrigger>::StateRepresentation::SetOnExit(std::function<void(TransitionInfo)> handler)
+    {
+        m_onExit = handler;
+    }
+
+    template<typename TState, typename TTrigger>
+    inline void StateMachine<TState, TTrigger>::StateRepresentation::AddGuardClause(TTrigger trigger, std::function<bool()> guard) 
+    {
+        m_guardClauses[(unsigned int)trigger] = guard;
+    }
+
+    template<typename TState, typename TTrigger>
     inline bool PS::StateMachine<TState, TTrigger>::StateRepresentation::FindTransition(TState& transitionOnOutput, TTrigger trigger)
     {
-        auto& currentState = m_stateMachinePtr->m_states[(unsigned int)State];
-        auto& v = currentState.AllowedTransitions;
 
-        if ((int)v[(int)trigger]) {
-            transitionOnOutput = v[(int)trigger];
+        if ((int)m_allowedTransitions[(int)trigger]) {
+            transitionOnOutput = m_allowedTransitions[(int)trigger];
             return true;
         }
-        else if (SuperState) {
-            auto tr = SuperState->FindTransition(transitionOnOutput, trigger);
+        else if (m_superState) {
+            auto tr = m_superState->FindTransition(transitionOnOutput, trigger);
             return tr;
         }
         return false;
@@ -219,7 +279,7 @@ namespace PS {
 
         if (state == State)
             return true;
-        for (auto s : SubStates) {
+        for (auto s : m_subStates) {
             if (s->State == state)
                 return true;
         }
@@ -230,12 +290,12 @@ namespace PS {
     inline void PS::StateMachine<TState, TTrigger>::StateRepresentation::Enter(TransitionInfo t)
     {
         if (t.IsReentry) {
-            OnEnter(t);
+            m_onEnter(t);
         }
         else if (!Includes(t.From)) {
-            if (SuperState)
-                SuperState->Enter(t);
-            OnEnter(t);
+            if (m_superState)
+                m_superState->Enter(t);
+            m_onEnter(t);
         }
     }
 
@@ -243,25 +303,42 @@ namespace PS {
     inline void PS::StateMachine<TState, TTrigger>::StateRepresentation::Exit(TransitionInfo t)
     {
         if (t.IsReentry) {
-            OnExit(t);
+            m_onExit(t);
         }
         else if (!Includes(t.To)) {
-            OnExit(t);
-            if (SuperState != nullptr) {
+            m_onExit(t);
+            if (m_superState != nullptr) {
                 if (IsIncludedIn(t.To)) {
 
                 }
                 else {
-                    SuperState->Exit(t);
+                    m_superState->Exit(t);
                 }
             }
         }
     }
 
     template<typename TState, typename TTrigger>
+    inline void StateMachine<TState, TTrigger>::StateRepresentation::GetAllowedTransitions(std::vector<TTrigger>& returnvec) const
+    {
+
+        for (int i = 0; i < m_allowedTransitions.size(); i++) {
+            if ((int)m_allowedTransitions[i] != 0) {
+                returnvec.push_back((TTrigger)i);
+            }
+        }
+        for (int i = 0; i < m_internalTransitions.size(); i++) {
+            if (m_internalTransitions[i] != nullptr) {
+                returnvec.push_back((TTrigger)i);
+            }
+        }
+    }
+
+
+    template<typename TState, typename TTrigger>
     inline bool PS::StateMachine<TState, TTrigger>::StateRepresentation::IsIncludedIn(TState state)
     {
-        return State == state || (SuperState != nullptr && SuperState->IsIncludedIn(state));
+        return State == state || (m_superState != nullptr && m_superState->IsIncludedIn(state));
     }
 
 #pragma endregion
@@ -278,8 +355,6 @@ namespace PS {
         else if (m_firingMode == PSFiringMode::Queued) {
             FireInternalQueued(trigger);
         }
-        
-
     }
 
 
@@ -289,8 +364,8 @@ namespace PS {
         try {
             Fire(trigger);
         }
-        catch(std::exception& e){
-            
+        catch (std::exception& e) {
+
         }
     }
 
@@ -298,21 +373,30 @@ namespace PS {
     inline void PS::StateMachine<TState, TTrigger>::FireInternalImmediate(TTrigger trigger)
     {
         auto& currentState = m_states[(unsigned int)m_currentState];
-        auto& internalTransitions = currentState.InternalTransitions;
+        const auto& guardClauses = currentState.GetGuardClauses();
+        /*
+            if there is an internal transition set up this will override the same trigger being set as an external transition
 
-        
-        // see if there is a transition to another state allowed
-        auto& v = currentState.AllowedTransitions;
+            could change this to be that the internal transition will fire and then the external trigger, don't know if this would be preferable or not
+        */
+
+
         TState nextstateEnum;
+
+        // see if there is any external transitions allowed.
+        // if not check for any internal transtitions
         if (!currentState.FindTransition(nextstateEnum, trigger)) {
-            // if not check for any internal transtitions
             TransitionInfo t;
             t.From = m_currentState;
             t.To = m_currentState;
             std::function<void(TransitionInfo)> internalT = nullptr;
             if (currentState.FindInternalTransition(internalT, trigger)) {
-                // if an internal transiton has been found, do the action
-                // and then return
+                if (guardClauses[(int)trigger] != nullptr) {
+                    if (!guardClauses[(int)trigger]()) {
+                        std::cout << "guard clause failed " << std::endl;
+                        return;
+                    }
+                }
                 internalT(t);
                 return;
             }
@@ -321,15 +405,21 @@ namespace PS {
                 // on external or internal transitions
                 throw TriggerNotFoundException(currentState.State, trigger);
             }
-            
+
         }
         // if this point has been reached, there's an external transition
         // for this trigger. Do entry and exit actions
+        if (guardClauses[(int)trigger] != nullptr) {
+            if (!guardClauses[(int)trigger]()) {
+                std::cout << "guard clause failed " << std::endl;
+                return;
+            }
+        }
         TransitionInfo t;
         t.From = m_currentState;
         t.To = nextstateEnum;
         bool onExitException = false;
-        if (currentState.OnExit) {
+        if (currentState.HasExitHandler()) {
             try {
                 currentState.Exit(t);
             }
@@ -341,7 +431,7 @@ namespace PS {
         }
         auto& nextstate = m_states[(unsigned int)nextstateEnum];
         bool onEnterException = false;
-        if (nextstate.OnEnter) {
+        if (nextstate.HasEnterHandler()) {
             try {
                 nextstate.Enter(t);
             }
@@ -363,25 +453,27 @@ namespace PS {
     template<typename TState, typename TTrigger>
     inline void PS::StateMachine<TState, TTrigger>::FireInternalQueued(TTrigger trigger)
     {
-        static bool firing = false;
+        // will queue the trigger and then process triggers on the queue until it is empty.
+        // if another thread calls this method while the 
+        static bool s_isQueueBeingHandled = false;
+        static std::mutex s_isQueueBeingHandledMutex;
 
         {
             std::lock_guard<std::mutex> lg(m_eventQueueMutex);
             m_eventQueue.push(trigger);
         }
         {
-            std::lock_guard<std::mutex> lg(m_firingMutex);
-            if (firing) {
+            std::lock_guard<std::mutex> lg(s_isQueueBeingHandledMutex);
+            if (s_isQueueBeingHandled) {
                 return;
             }
             else {
-                firing = true;
+                s_isQueueBeingHandled = true;
             }
         }
-        
-        try {                         // microsoft 
-            
-            while (!m_eventQueue.empty()) {
+
+        try {
+            while (!EventQueueEmpty()) {
                 TTrigger trigger = m_eventQueue.front();
                 m_eventQueue.pop();
                 FireInternalImmediate(trigger);
@@ -390,21 +482,24 @@ namespace PS {
         catch (TriggerNotFoundException e) {
             std::string txt = e.what();
             std::cout << txt << std::endl;
-            firing = false;
+            s_isQueueBeingHandled = false;
             throw e;
         }
-        catch(std::exception& e) {
+        catch (std::exception& e) {
             std::string txt = e.what();
             std::cout << txt << std::endl;
-            firing = false;
+            s_isQueueBeingHandled = false;
             throw e;
         }
-        
-        firing = false;
+
+        {
+            std::lock_guard<std::mutex> lg(s_isQueueBeingHandledMutex);
+            s_isQueueBeingHandled = false;
+        }
     }
 
     template<typename TState, typename TTrigger>
-    inline void PS::StateMachine<TState, TTrigger>::RunAsync()
+    inline void PS::StateMachine<TState, TTrigger>::RunActive()
     {
         auto worker = [this]() {
             while (m_asyncMode) {
@@ -425,11 +520,12 @@ namespace PS {
         }
     }
 
+
     template<typename TState, typename TTrigger>
     inline void StateMachine<TState, TTrigger>::HandleEventQueue()
     {
-        
-        while (!m_eventQueue.empty()) {
+
+        while (!EventQueueEmpty()) {
             TTrigger trigger = m_eventQueue.front();
             m_eventQueue.pop();
             try {
@@ -439,8 +535,23 @@ namespace PS {
                 std::cout << e.what() << std::endl;
             }
         }
-        if(m_isFiringEvents)
+        if (m_isFiringEvents)
             m_isFiringEvents = false;
+    }
+
+
+
+    template<typename TState, typename TTrigger>
+    inline StateMachine<TState, TTrigger>::StateMachine(int numstates, int numtriggers, TState initialState)
+        : m_currentState(initialState), m_numStates(numstates), m_numTriggers(numtriggers) {
+        m_states.resize(numstates);
+        for (int i = 0; i < numstates; i++) {
+            auto& state = m_states[i];
+            state.ResizeTransitions(numtriggers);
+            state.ResizeInternalTransitions(numtriggers);
+            state.ResizeGuardClauses(numtriggers);
+            state.SetStateMachinePtr(this);
+        }
     }
 
     template<typename TState, typename TTrigger>
@@ -453,18 +564,26 @@ namespace PS {
     }
 
     template<typename TState, typename TTrigger>
-    inline std::vector<TTrigger> PS::StateMachine<TState, TTrigger>::GetCurrentAllowedTransitions()
+    inline std::vector<TTrigger> PS::StateMachine<TState, TTrigger>::GetCurrentAvailableTransitions() const
     {
         std::vector<TTrigger> returnvec;
-        auto& allowedTransitions = m_states[(int)m_currentState].AllowedTransitions;
-        for (int i = 0; i < m_numTriggers; i++) {
-            if ((int)allowedTransitions[i] != 0) {
-                returnvec.push_back((TTrigger)i);
-            }
-        }
+        m_states[(int)m_currentState].GetAllowedTransitions(returnvec);
         return returnvec;
     }
 
+    template<typename TState, typename TTrigger>
+    inline bool PS::StateMachine<TState, TTrigger>::EventQueueEmpty()
+    {
+        bool returnval;
+
+        {
+            std::lock_guard<std::mutex> lg(m_eventQueueMutex);
+            returnval = m_eventQueue.empty();
+        }
+        return returnval;
+    }
+
 #pragma endregion
+
 
 } // end of namespace PS
