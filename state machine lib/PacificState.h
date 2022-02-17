@@ -61,7 +61,7 @@ namespace PS {
 
         class StateRepresentation {
         public:
-            StateRepresentation(TState s, StateMachine* sm) :State(s) {}
+            StateRepresentation(TState s) :State(s) {}
             StateRepresentation() {}
             // setters
             void AddTransition(TTrigger trigger, TState state);
