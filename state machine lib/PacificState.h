@@ -61,7 +61,7 @@ namespace PS {
 
         class StateRepresentation {
         public:
-            StateRepresentation(TState s, StateMachine* sm) :State(s), m_stateMachinePtr(sm) {}
+            StateRepresentation(TState s, StateMachine* sm) :State(s) {}
             StateRepresentation() {}
             // setters
             void AddTransition(TTrigger trigger, TState state);
@@ -74,29 +74,31 @@ namespace PS {
             
             bool FindTransition(TState& transitionOnOutput, TTrigger trigger);
             bool FindInternalTransition(std::function<void(TransitionInfo)>& transitionFunction, TTrigger trigger);
-            bool Includes(TState state); // is state this state or one of its sub states
-            bool IsIncludedIn(TState state); // Checks if the state is in the set of this state or a super-state
+            
+
             void Enter(TransitionInfo t);
             void Exit(TransitionInfo t);
-            bool HasEnterHandler() { return m_onEnter != nullptr; }
-            bool HasExitHandler() { return m_onExit != nullptr; }
-            void ResizeTransitions(size_t val) { m_allowedTransitions.resize(val); }
-            void ResizeInternalTransitions(size_t val) { m_internalTransitions.resize(val); }
-            void ResizeGuardClauses(size_t val) { m_guardClauses.resize(val); }
-            void SetStateMachinePtr(StateMachine* ptr) { m_stateMachinePtr = ptr; }
+
             void GetAllowedTransitions(std::vector<TTrigger>& returnvec) const;
-            const std::vector<std::function<bool()>>& GetGuardClauses() { return m_guardClauses; }
+            bool HasEnterHandler() const                                      { return m_onEnter != nullptr; } 
+            bool HasExitHandler() const                                       { return m_onExit != nullptr; }
+            const std::vector<std::function<bool()>>& GetGuardClauses() const { return m_guardClauses; }
+
+            void ResizeTransitions(size_t val)                                { m_allowedTransitions.resize(val); }
+            void ResizeInternalTransitions(size_t val)                        { m_internalTransitions.resize(val); }
+            void ResizeGuardClauses(size_t val)                               { m_guardClauses.resize(val); }
 
         public:
             TState State;
 
         private:
+            bool Includes(TState state) const; // is state this state or one of its sub states
+            bool IsIncludedIn(TState state) const; // Checks if the state is in the set of this state or a super-state
+        private:
             std::vector<std::function<bool()>> m_guardClauses;
-            StateMachine* m_stateMachinePtr = nullptr;
             std::vector<TState> m_allowedTransitions;
             std::vector<std::function<void(TransitionInfo)>> m_internalTransitions;
             
-
             std::function<void(TransitionInfo)> m_onEnter = nullptr;
             std::function<void(TransitionInfo)> m_onExit = nullptr;
             StateRepresentation* m_superState = nullptr;
@@ -274,7 +276,7 @@ namespace PS {
     }
 
     template<typename TState, typename TTrigger>
-    inline bool PS::StateMachine<TState, TTrigger>::StateRepresentation::Includes(TState state)
+    inline bool PS::StateMachine<TState, TTrigger>::StateRepresentation::Includes(TState state) const
     {
 
         if (state == State)
@@ -336,7 +338,7 @@ namespace PS {
 
 
     template<typename TState, typename TTrigger>
-    inline bool PS::StateMachine<TState, TTrigger>::StateRepresentation::IsIncludedIn(TState state)
+    inline bool PS::StateMachine<TState, TTrigger>::StateRepresentation::IsIncludedIn(TState state) const
     {
         return State == state || (m_superState != nullptr && m_superState->IsIncludedIn(state));
     }
@@ -550,7 +552,6 @@ namespace PS {
             state.ResizeTransitions(numtriggers);
             state.ResizeInternalTransitions(numtriggers);
             state.ResizeGuardClauses(numtriggers);
-            state.SetStateMachinePtr(this);
         }
     }
 
