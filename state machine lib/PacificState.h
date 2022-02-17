@@ -176,6 +176,7 @@ namespace PS {
 
     public:
         StateConfigObject ConfigState(TState state) {
+            assert((int)state != 0); // Enum value zero should not be used, it should represent "null", "nothing", "no state", ect.
             StateConfigObject config(this);
             config.StateEnum = state;
             m_states[(int)state].State = state;
@@ -418,6 +419,7 @@ namespace PS {
             }
         }
         TransitionInfo t;
+        std::exception innerException;
         t.From = m_currentState;
         t.To = nextstateEnum;
         bool onExitException = false;
@@ -426,10 +428,9 @@ namespace PS {
                 currentState.Exit(t);
             }
             catch (std::exception e) {
-
                 onExitException = true;
+                innerException = e;
             }
-
         }
         auto& nextstate = m_states[(unsigned int)nextstateEnum];
         bool onEnterException = false;
@@ -439,16 +440,23 @@ namespace PS {
             }
             catch (std::exception e) {
                 onEnterException = true;
+                innerException = e;
             }
         }
         m_currentState = nextstateEnum;
 
         if (onExitException) {
-            //std::cout << 
-            // fire state machine faulted event
+            std::cout << "On exit exception" << std::endl;
+            // (fire state machine faulted event here)
+            m_currentState = (TState)0;
+            throw innerException;
         }
         if (onEnterException) {
-            // fire state machine faulted event
+            std::cout << "On enter exception" << std::endl;
+            // (fire state machine faulted event here)
+            m_currentState = (TState)0;
+            throw innerException;
+            
         }
     }
 

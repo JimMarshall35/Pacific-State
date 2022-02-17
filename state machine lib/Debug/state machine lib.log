@@ -1,10 +1,10 @@
 ﻿  main.cpp
-C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cpp(191,27): warning C4018: '<': signed/unsigned mismatch
-C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cpp(208,20): warning C4018: '<': signed/unsigned mismatch
-C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(327,27): warning C4018: '<': signed/unsigned mismatch
-C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(325): message : while compiling class template member function 'void PS::StateMachine<States,Triggers>::StateRepresentation::GetAllowedTransitions(std::vector<Triggers,std::allocator<Triggers>> &) const'
-C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(571): message : see reference to function template instantiation 'void PS::StateMachine<States,Triggers>::StateRepresentation::GetAllowedTransitions(std::vector<Triggers,std::allocator<Triggers>> &) const' being compiled
-C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(548): message : while compiling class template member function 'PS::StateMachine<States,Triggers>::StateMachine(int,int,TState)'
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cpp(192,27): warning C4018: '<': signed/unsigned mismatch
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cpp(209,20): warning C4018: '<': signed/unsigned mismatch
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(328,27): warning C4018: '<': signed/unsigned mismatch
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(326): message : while compiling class template member function 'void PS::StateMachine<States,Triggers>::StateRepresentation::GetAllowedTransitions(std::vector<Triggers,std::allocator<Triggers>> &) const'
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(579): message : see reference to function template instantiation 'void PS::StateMachine<States,Triggers>::StateRepresentation::GetAllowedTransitions(std::vector<Triggers,std::allocator<Triggers>> &) const' being compiled
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(556): message : while compiling class template member function 'PS::StateMachine<States,Triggers>::StateMachine(int,int,TState)'
           with
           [
               TState=States
@@ -15,5 +15,5 @@ C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cp
               TState=States
           ]
 C:\Users\james.marshall\source\repos\state machine lib\state machine lib\main.cpp(43): message : see reference to class template instantiation 'PS::StateMachine<States,Triggers>' being compiled
-C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(332,27): warning C4018: '<': signed/unsigned mismatch
+C:\Users\james.marshall\source\repos\state machine lib\state machine lib\PacificState.h(333,27): warning C4018: '<': signed/unsigned mismatch
   state machine lib.vcxproj -> C:\Users\james.marshall\source\repos\state machine lib\Debug\state machine lib.exe

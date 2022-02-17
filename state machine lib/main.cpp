@@ -113,6 +113,7 @@ int main(int argc, char* argv[]) {
 		.SubStateOf(States::NonPlaying)
 		.OnEntry([](PS::StateMachine<States, Triggers>::TransitionInfo t) {
 				std::cout << "entering level editor" << std::endl;
+				throw std::exception();
 			})
 		.OnExit([](PS::StateMachine<States, Triggers>::TransitionInfo t) {
 				std::cout << "exiting level editor" << std::endl;
